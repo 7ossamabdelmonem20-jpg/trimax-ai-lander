@@ -5,21 +5,22 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { Sparkles, Globe, Moon, Sun, Bot, ShieldCheck, Zap, ChevronLeft, ChevronRight } from "lucide-react";
 import ChatWidget from "@/components/ChatWidget";
+import Link from "next/link";
 
 const T = {
   AR: {
-    badge: "الشركة الوحيدة في المملكة العربية السعودية بتقنية الحجز الذكي",
-    title1: "راحة بالك تبدأ من هنا.",
-    title2: "نظافة وبرودة بلا انتظار.",
-    desc: "لأن وقتك وراحتك هي أولويتنا القصوى، استغنينا عن طرق الحجز التقليدية. نحن نستخدم مساعداً ذكياً يعمل بالـ AI ليخدمك فوراً؛ حتى لا تنتظر دقيقة واحدة للرد. احجز خدمة غسيل المكيفات والنظافة العامة الآن في ثوانٍ.",
+    badge: "أفضل شركة نظافة عامة في المملكة العربية السعودية",
+    title1: "نظافة منزلك الشاملة",
+    title2: "بكل احترافية وإتقان.",
+    desc: "نقدم لك خدمات النظافة العامة المتكاملة بأعلى معايير الجودة. سواء كنت تبحث عن غسيل مكيفات، تنظيف خزانات، غسيل سجاد وموكيت، تنظيف مجالس، أو مكافحة الحشرات، لدينا فريق محترف لخدمتك في جميع أنحاء المملكة. احجز خدمتك الآن في ثوانٍ عبر المساعد الذكي.",
     btn: "تحدث مع المساعد الذكي للحجز",
-    trust: "الرد والحجز آلي وفوري على مدار 24 ساعة"
+    trust: "حجز آلي وفوري على مدار 24 ساعة"
   },
   EN: {
-    badge: "The Only Company in Saudi Arabia with Smart Booking Technology",
-    title1: "Your Peace of Mind Starts Here.",
-    title2: "Cleanliness & Cooling, No Waiting.",
-    desc: "Because your time and comfort are our top priority, we skipped traditional booking. We use an AI-powered smart assistant to serve you instantly, so you don't wait a single minute. Book your AC cleaning and general maintenance in seconds.",
+    badge: "The Best General Cleaning Company in KSA",
+    title1: "Comprehensive Home Cleaning",
+    title2: "With Professionalism & Perfection.",
+    desc: "We offer integrated general cleaning services with the highest quality standards. Whether you need AC cleaning, tank cleaning, carpet washing, or pest control, our professional team serves you all over the Kingdom. Book your service in seconds via our Smart Assistant.",
     btn: "Chat with AI Assistant to Book",
     trust: "Automated & Instant Booking 24/7"
   }
@@ -29,7 +30,6 @@ export default function Home() {
   const [isDark, setIsDark] = useState<boolean>(true);
   const [lang, setLang] = useState<"AR" | "EN">("AR");
   
-  // رفع حالة الشات للمكون الأب للتحكم المعماري السليم
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
@@ -87,20 +87,18 @@ export default function Home() {
   return (
     <main ref={containerRef} className="min-h-[100svh] w-full flex flex-col relative overflow-hidden bg-slate-50 dark:bg-[#020617] text-slate-900 dark:text-slate-50 transition-colors duration-500 selection:bg-cyan-500/30">
       
-      {/* Background Lighting */}
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
         <div className="cta-glow absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150vw] h-[150vw] md:w-[70vw] md:h-[70vw] bg-gradient-to-tr from-blue-600/10 via-cyan-500/10 to-transparent blur-[80px] dark:blur-[130px] rounded-full" />
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.05] dark:opacity-[0.03] mix-blend-overlay" />
       </div>
 
-      {/* Navbar */}
       <nav className="reveal-elem relative z-10 w-full p-4 md:p-6 lg:p-8 flex justify-between items-center max-w-7xl mx-auto">
         <div className="flex items-center gap-2 group cursor-pointer">
           <div className="bg-gradient-to-br from-blue-600 to-cyan-500 p-2 md:p-2.5 rounded-xl shadow-lg shadow-blue-500/20">
             <Sparkles className="text-white w-5 h-5 md:w-6 md:h-6" />
           </div>
           <span className="text-xl md:text-2xl font-black tracking-tight">
-            Trimax<span className="text-cyan-500">.</span>
+            CleanHouse<span className="text-cyan-500">.</span>
           </span>
         </div>
 
@@ -122,7 +120,6 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* Hero Section */}
       <div className="relative z-10 flex-1 flex flex-col justify-center items-center px-4 sm:px-6 w-full max-w-5xl mx-auto text-center mt-[-5vh]">
         
         <div className="smart-badge inline-flex items-center justify-center gap-2 py-1.5 px-3 md:py-2 md:px-5 rounded-full bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-cyan-500/30 text-[10px] sm:text-xs md:text-sm font-bold mb-6 md:mb-8 text-blue-800 dark:text-cyan-300 shadow-sm backdrop-blur-md transform-gpu">
@@ -162,8 +159,22 @@ export default function Home() {
         </div>
       </div>
 
-      {/* تمرير الحالة لـ ChatWidget */}
       <ChatWidget lang={lang} isOpen={isChatOpen} setIsOpen={setIsChatOpen} />
+
+      {/* Trimax Footer Badge */}
+      <div className="relative z-10 w-full flex justify-center pb-6 mt-auto">
+        <Link 
+          href="/trimax" 
+          rel="noopener noreferrer" 
+          target="_blank"
+          className="group flex items-center gap-2 px-4 py-2 rounded-full bg-slate-100 dark:bg-[#0f172a]/80 border border-slate-200 dark:border-slate-800/50 hover:border-cyan-500/50 transition-all hover:shadow-lg hover:shadow-cyan-500/20 backdrop-blur-md"
+        >
+          <img src="/trimax-logo.jpeg" alt="Trimax Logo" className="w-5 h-5 object-contain" />
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors">
+            Powered by Trimax Software Intelligence
+          </span>
+        </Link>
+      </div>
     </main>
   );
 }

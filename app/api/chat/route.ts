@@ -1,65 +1,109 @@
-// app/api/chat/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
+import dbConnect from '@/lib/dbConnect';
+import Lead from "@/models/Lead";
+import { z } from 'zod';
 
-interface ChatRequest {
-  message: string;
+const envSchema = z.object({
+  MONGODB_URI: z.string().min(1, "MONGODB_URI is required"),
+  N8N_WEBHOOK_URL: z.string().url("N8N_WEBHOOK_URL must be a valid URL"),
+});
+
+const envParsed = envSchema.safeParse(process.env);
+
+if (!envParsed.success) {
+  console.error("❌ Invalid environment variables:", envParsed.error.format());
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const body: ChatRequest = await request.json();
-    const { message } = body;
+const ChatRequestSchema = z.object({
+  sessionId: z.string().uuid("Invalid session ID format"),
+  message: z.string().min(1, "Message cannot be empty").max(1000, "Message is too long"),
+});
 
-    if (!message || message.trim() === "") {
-      return NextResponse.json(
-        { error: "الرسالة لا يمكن أن تكون فارغة" },
-        { status: 400 }
-      );
+export async function POST(req: Request) {
+  try {
+    if (!envParsed.success) {
+      return NextResponse.json({ error: "Server Configuration Error" }, { status: 500 });
     }
 
-    // ==========================================
-    // MOCK RESPONSE (Phase 1)
-    // ==========================================
-    // محاكاة تأخير الشبكة لتبدو كاستجابة حقيقية
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const body = await req.json();
+    const validation = ChatRequestSchema.safeParse(body);
     
-    const mockResponse = `لقد استلمنا رسالتك: "${message}". فريق Trimax سيقوم بمعالجتها فوراً. هل هناك تفاصيل أخرى تود إضافتها؟`;
+    if (!validation.success) {
+      return NextResponse.json({ error: "Invalid payload format", details: validation.error.format() }, { status: 400 });
+    }
 
-    return NextResponse.json({ response: mockResponse });
+    const { sessionId, message } = validation.data;
 
-    // ==========================================
-    // PRODUCTION LOGIC (n8n Webhook - Phase 2)
-    // ==========================================
-    /*
-    const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL as string;
+    await dbConnect();
+
+    let lead = await Lead.findOne({ sessionId });
     
-    const n8nResponse = await fetch(n8nWebhookUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // أضف أي Authentication Headers إذا كانت مطلوبة في n8n
-        // "Authorization": `Bearer ${process.env.N8N_SECRET}`
-      },
-      body: JSON.stringify({
-        sessionId: request.headers.get('x-session-id') || "anonymous",
-        message: message,
-        timestamp: new Date().toISOString()
-      }),
-    });
+    if (lead) {
+      const now = new Date();
+      const lastInteraction = lead.metadata?.lastInteraction || new Date(0);
+      if (now.getTime() - lastInteraction.getTime() < 2000) {
+        return NextResponse.json({ error: "الرجاء الانتظار قليلاً قبل إرسال رسالة أخرى." }, { status: 429 });
+      }
+      lead.metadata.lastInteraction = new Date();
+    } else {
+      lead = await Lead.create({ 
+        sessionId,
+        status: 'PENDING_AI',
+        chatHistory: [],
+        metadata: { lastInteraction: new Date() }
+      });
+    }
+
+    lead.chatHistory.push({ role: 'user', content: message, timestamp: new Date() });
+    await lead.save();
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    let n8nResponse;
+    try {
+      n8nResponse = await fetch(process.env.N8N_WEBHOOK_URL as string, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          sessionId: lead.sessionId, 
+          message: message,
+          status: lead.status 
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      console.error("n8n Fetch Error:", fetchError);
+      return NextResponse.json({ response: "عذراً، النظام يقوم بتحديث بياناته الآن. يرجى المحاولة بعد لحظات." }, { status: 503 });
+    }
 
     if (!n8nResponse.ok) {
-      throw new Error(`n8n API responded with status ${n8nResponse.status}`);
+      throw new Error(`n8n responded with status: ${n8nResponse.status}`);
     }
 
-    const data = await n8nResponse.json();
-    return NextResponse.json({ response: data.output || "عذراً، لم نتمكن من معالجة طلبك." });
-    */
+    const aiResult = await n8nResponse.json();
+    const aiMessage = aiResult.response || "تم استلام طلبك بنجاح.";
+
+    // Track 1: Update Lead if n8n provides extractedData (No Regex!)
+    if (aiResult.extractedData) {
+      if (aiResult.extractedData.phone) lead.phone = aiResult.extractedData.phone;
+      if (aiResult.extractedData.name) lead.name = aiResult.extractedData.name;
+    }
+
+    lead.chatHistory.push({ role: 'assistant', content: aiMessage, timestamp: new Date() });
+    
+    if (aiResult.handover) {
+      lead.status = 'HANDED_OVER';
+    }
+    
+    await lead.save();
+
+    return NextResponse.json({ response: aiMessage });
 
   } catch (error) {
-    console.error("Chat API Error:", error);
-    return NextResponse.json(
-      { error: "حدث خطأ داخلي في الخادم أثناء معالجة الرسالة." },
-      { status: 500 }
-    );
+    console.error("API Chat Error:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

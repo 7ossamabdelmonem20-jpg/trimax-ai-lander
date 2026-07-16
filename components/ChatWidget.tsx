@@ -17,39 +17,47 @@ interface ChatWidgetProps {
 
 const UI_TEXT = {
   AR: {
-    title: "مساعد Trimax الذكي",
-    status: "متصل الآن - استجابة فورية ⚡",
-    placeholder: "اكتب اسمك ورقم الجوال هنا...",
+    title: "مساعد الشركة الذكي",
+    status: "متصل الآن - استجابة فورية ",
+    placeholder: "اكتب رسالتك هنا...",
     security: "محادثة مشفرة وآمنة بنسبة 100%",
     loading: "الذكاء الاصطناعي يحلل طلبك...",
     error: "عذراً، يبدو أن هناك ضغطاً على الشبكة. يرجى المحاولة مرة أخرى.",
-    initMsg: "أهلاً بك في Trimax 🌟 أنا مساعدك الذكي، متواجد هنا لأوفر عليك وقت الانتظار. لنجدول موعدك فوراً وبأفضل سعر، ما هو الاسم الكريم ورقم الجوال للتواصل؟"
+    initMsg: "أهلاً بك في أفضل شركة نظافة بالمملكة ✨ كيف نخدمك اليوم؟ (نظافة شاملة، غسيل مكيفات، تنظيف خزانات، مكافحة حشرات...)"
   },
   EN: {
-    title: "Trimax AI Assistant",
-    status: "Online - Instant Response ⚡",
-    placeholder: "Type your name and phone number here...",
+    title: "Smart AI Assistant",
+    status: "Online - Instant Response ",
+    placeholder: "Type your message here...",
     security: "100% Secure & Encrypted Chat",
     loading: "AI is analyzing your request...",
     error: "Sorry, network is busy. Please try again.",
-    initMsg: "Welcome to Trimax 🌟 I'm your smart assistant, here to save your time. To schedule your appointment instantly at the best price, what is your full name and phone number?"
+    initMsg: "Welcome to the best cleaning company in KSA ✨ How can we serve you today? (General Cleaning, AC Cleaning, Tank Cleaning, Pest Control...)"
   }
 };
 
 export default function ChatWidget({ lang, isOpen, setIsOpen }: ChatWidgetProps) {
-  // تهيئة الرسالة الأولى بمعرف ثابت لتسهيل ترجمتها لاحقاً دون مسح الحالة
   const [messages, setMessages] = useState<Message[]>([
     { id: "init-1", role: "assistant", content: "INIT_MSG_PLACEHOLDER" }
   ]);
   const [inputValue, setInputValue] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [sessionId, setSessionId] = useState<string>("");
+
+  useEffect(() => {
+    let storedSession = localStorage.getItem("trimax_session_id");
+    if (!storedSession) {
+      storedSession = crypto.randomUUID();
+      localStorage.setItem("trimax_session_id", storedSession);
+    }
+    setSessionId(storedSession);
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // تعطيل التمرير في الخلفية عند فتح الشات
   useEffect(() => {
     if (isOpen) {
       scrollToBottom();
@@ -62,9 +70,8 @@ export default function ChatWidget({ lang, isOpen, setIsOpen }: ChatWidgetProps)
 
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim() || isLoading) return;
+    if (!inputValue.trim() || isLoading || !sessionId) return;
 
-    // استخدام UUID بدلاً من Date.now لضمان عدم تكرار المفاتيح
     const userMessage: Message = { 
       id: crypto.randomUUID(), 
       role: "user", 
@@ -79,10 +86,19 @@ export default function ChatWidget({ lang, isOpen, setIsOpen }: ChatWidgetProps)
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userMessage.content }),
+        body: JSON.stringify({ 
+          sessionId: sessionId,
+          message: userMessage.content 
+        }),
       });
 
-      if (!response.ok) throw new Error("Network response error");
+      if (!response.ok) {
+        if (response.status === 429) {
+          const data = await response.json();
+          throw new Error(data.error || "Too many requests");
+        }
+        throw new Error("Network response error");
+      }
       const data = await response.json();
       
       setMessages((prev) => [...prev, { 
@@ -90,25 +106,23 @@ export default function ChatWidget({ lang, isOpen, setIsOpen }: ChatWidgetProps)
         role: "assistant", 
         content: data.response 
       }]);
-    } catch (error) {
+    } catch (error: any) {
       setMessages((prev) => [...prev, { 
         id: crypto.randomUUID(), 
         role: "assistant", 
-        content: UI_TEXT[lang].error 
+        content: error.message || UI_TEXT[lang].error 
       }]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ديناميكية الترجمة: نترجم الرسالة الافتراضية وقت العرض دون تدمير الـ State
   const displayMessages = messages.map(msg => 
     msg.id === "init-1" ? { ...msg, content: UI_TEXT[lang].initMsg } : msg
   );
 
   return (
     <>
-      {/* أيقونة فتح الشات العائمة */}
       {!isOpen && (
         <div className="fixed bottom-6 left-6 rtl:right-6 rtl:left-auto z-40 flex flex-col items-end">
           <button
@@ -124,12 +138,10 @@ export default function ChatWidget({ lang, isOpen, setIsOpen }: ChatWidgetProps)
         </div>
       )}
 
-      {/* نافذة الشات */}
       {isOpen && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-slate-50 dark:bg-[#0f172a] w-full max-w-2xl h-[85vh] sm:h-[75vh] min-h-[500px] max-h-[800px] rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-300">
             
-            {/* Header */}
             <div className="relative bg-gradient-to-r from-blue-700 to-cyan-600 text-white p-5 flex justify-between items-center shadow-md shrink-0">
               <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay"></div>
               <div className="relative z-10 flex items-center gap-4">
@@ -155,7 +167,6 @@ export default function ChatWidget({ lang, isOpen, setIsOpen }: ChatWidgetProps)
               </button>
             </div>
 
-            {/* Messages */}
             <div className="flex-1 p-4 sm:p-6 overflow-y-auto flex flex-col gap-5 bg-slate-50/50 dark:bg-[#020617]/50 scroll-smooth">
               {displayMessages.map((msg) => (
                 <div key={msg.id} className={`flex w-full ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -172,7 +183,7 @@ export default function ChatWidget({ lang, isOpen, setIsOpen }: ChatWidgetProps)
               ))}
               
               {isLoading && (
-                <div className="flex w-full justify-start">
+               <div className="flex w-full justify-start">
                   <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl rtl:rounded-br-sm ltr:rounded-bl-sm px-5 py-4 shadow-sm flex items-center gap-3">
                     <Loader2 size={18} className="text-cyan-500 animate-spin" />
                     <span className="text-sm font-medium text-slate-500 dark:text-slate-400">{UI_TEXT[lang].loading}</span>
@@ -182,7 +193,6 @@ export default function ChatWidget({ lang, isOpen, setIsOpen }: ChatWidgetProps)
               <div ref={messagesEndRef} className="h-2" />
             </div>
 
-            {/* Input Form */}
             <div className="p-4 sm:p-5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0">
               <form onSubmit={handleSendMessage} className="flex items-center gap-3 relative">
                 <input
