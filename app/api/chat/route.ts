@@ -64,7 +64,10 @@ export async function POST(req: Request) {
     try {
       n8nResponse = await fetch(process.env.N8N_WEBHOOK_URL as string, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        },
         body: JSON.stringify({ 
           sessionId: lead.sessionId, 
           message: message,
