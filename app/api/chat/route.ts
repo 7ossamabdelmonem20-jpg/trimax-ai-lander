@@ -8,12 +8,6 @@ const envSchema = z.object({
   N8N_WEBHOOK_URL: z.string().url("N8N_WEBHOOK_URL must be a valid URL"),
 });
 
-const envParsed = envSchema.safeParse(process.env);
-
-if (!envParsed.success) {
-  console.error("❌ Invalid environment variables:", envParsed.error.format());
-}
-
 const ChatRequestSchema = z.object({
   sessionId: z.string().uuid("Invalid session ID format"),
   message: z.string().min(1, "Message cannot be empty").max(1000, "Message is too long"),
@@ -21,7 +15,11 @@ const ChatRequestSchema = z.object({
 
 export async function POST(req: Request) {
   try {
+    // 1. نقلنا فحص متغيرات البيئة هنا لضمان قراءتها وقت التشغيل على سيرفر Vercel
+    const envParsed = envSchema.safeParse(process.env);
+    
     if (!envParsed.success) {
+      console.error("❌ Invalid environment variables:", envParsed.error.format());
       return NextResponse.json({ error: "Server Configuration Error" }, { status: 500 });
     }
 
@@ -108,8 +106,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ response: aiMessage });
 
-  } catch (error) {
-    console.error("API Chat Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  } catch (error: any) {
+    // 2. تحسين التقاط الأخطاء لمعرفة السبب الدقيق في Vercel Logs
+    console.error("API Chat Error:", error.message || error);
+    return NextResponse.json({ error: "Internal Server Error", details: error.message }, { status: 500 });
   }
 }
