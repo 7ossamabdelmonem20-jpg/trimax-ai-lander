@@ -30,6 +30,8 @@ const LeadSchema = new mongoose.Schema(
     ],
     metadata: {
       lastInteraction: Date,
+      service: String,
+      location: String,
     },
   },
   { timestamps: true }

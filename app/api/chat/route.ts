@@ -86,17 +86,20 @@ export async function POST(req: Request) {
     const aiResult = await n8nResponse.json();
     const aiMessage = aiResult.response || "تم استلام طلبك بنجاح.";
 
-    // Track 1: Update Lead if n8n provides extractedData (No Regex!)
+    // Update Lead if n8n provides extractedData
     if (aiResult.extractedData) {
-      if (aiResult.extractedData.phone) lead.phone = aiResult.extractedData.phone;
-      if (aiResult.extractedData.name) lead.name = aiResult.extractedData.name;
+      const { phone, name, service } = aiResult.extractedData;
+      const isValid = (val: any) => val && typeof val === "string" && val.trim() !== "" && val !== "null" && val !== "{{ $json.state.phone }}" && val !== "{{ $json.state.name }}" && val !== "{{ $json.state.service }}";
+      
+      if (isValid(phone)) lead.phone = phone;
+      if (isValid(name)) lead.name = name;
+      if (isValid(service)) {
+        lead.metadata = lead.metadata || {};
+        lead.metadata.service = service;
+      }
     }
 
     lead.chatHistory.push({ role: 'assistant', content: aiMessage, timestamp: new Date() });
-    
-    if (aiResult.handover) {
-      lead.status = 'HANDED_OVER';
-    }
     
     await lead.save();
 
